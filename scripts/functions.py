@@ -1,24 +1,24 @@
 # Import necessary libraries
 import numpy as np
-from scipy.signal import butter, filtfilt
+import matplotlib.pyplot as plt
+from scipy.signal import butter, sosfiltfilt, welch
 from scipy.stats import mode
 
 from features import *
 
-def bandpass_filter(data, lowcut, highcut, fs, order=4):
-    """Define a function to apply a bandpass filter to the data."""
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut / nyquist
-    b, a = butter(order, [low, high], btype='band')
-    y = filtfilt(b, a, data, axis=0)
-    return y
+def bandpass_filter(data, fs=2000.0, lowcut=20.0, highcut=450.0, order=4):
+    """Apply a bandpass filter and remove powerline noise and its harmonics."""
+    # Apply bandpass filter
+    sos = butter(order, [lowcut, highcut], fs=fs, btype='bandpass', output='sos')
+    filtered_data = sosfiltfilt(sos, data.T).T
 
-def reshape_data(data, samples_per_trial):
-    """Reshape the data into trials."""
-    num_trials = data.shape[0] // samples_per_trial
-    data_reshaped = data[:num_trials * samples_per_trial].reshape(num_trials, samples_per_trial, data.shape[1])
-    return data_reshaped
+    # Apply notch filters to remove powerline noise and its harmonics
+    powergrid_noise_frequencies_Hz = [harmonic_idx * 50 for harmonic_idx in range(1, 3)]  # 50Hz and 100Hz
+    for noise_frequency in powergrid_noise_frequencies_Hz:
+        sos = butter(order, [noise_frequency - 2, noise_frequency + 2], fs=fs, btype='bandstop', output='sos')
+        filtered_data = sosfiltfilt(sos, filtered_data.T).T
+
+    return filtered_data
 
 def extract_features_advanced(trial, deadzone, winsize, wininc):
     """Define a function to extract all features from a single trial."""
@@ -39,44 +39,76 @@ def extract_features_advanced(trial, deadzone, winsize, wininc):
 
     return feat
 
-def extract_features_basic(trial):
-    num_channels = trial.shape[1]
-    features = []
+# Frequency domain features
+def mean_frequency(x, fs=2000):
+    """Calculate the mean frequency of the signal."""
+    freqs, psd = welch(x, fs=fs, axis=0)
+    freqs = freqs[:, np.newaxis]
+    mean_freq = np.sum(freqs * psd, axis=0) / np.sum(psd, axis=0)
+    return mean_freq.mean() if mean_freq.size > 1 else mean_freq
 
-    for ch in range(num_channels):
-        channel_data = trial[:, ch]
+def median_frequency(x, fs=2000):
+    """Calculate the median frequency of the signal."""
+    freqs, psd = welch(x, fs=fs, axis=0)
+    cumulative_power = np.cumsum(psd, axis=0)
+    if psd.ndim == 1:
+        total_power = cumulative_power[-1]
+        median_freq = freqs[np.where(cumulative_power >= total_power / 2)[0][0]]
+    else:
+        total_power = cumulative_power[-1, :]
+        median_freqs = np.zeros(psd.shape[1])
+        for i in range(psd.shape[1]):
+            median_freqs[i] = freqs[np.where(cumulative_power[:, i] >= total_power[i] / 2)[0][0]]
+        median_freq = median_freqs.mean() if median_freqs.size > 1 else median_freqs
+    return median_freq
 
-        # Mean Absolute Value (MAV)
-        mav = np.mean(np.abs(channel_data))
-        # Mean Absolute Value Slope (MAVS)
-        mavs = np.mean(np.abs(np.diff(channel_data)))
-        # Root Mean Square (RMS)
-        rms = np.sqrt(np.mean(channel_data**2))
-        # Zero Crossing (ZC)
-        zc = np.sum(np.diff(np.sign(channel_data)) != 0)
-        # Waveform Length (WL)
-        wl = np.sum(np.abs(np.diff(channel_data)))
-        # Slope Sign Changes (SSC)
-        ssc = np.sum(np.diff(np.sign(np.diff(channel_data))) != 0)
+def total_power(x, fs=2000):
+    """Calculate the total power of the signal."""
+    freqs, psd = welch(x, fs=fs, axis=0)
+    total_pwr = np.sum(psd, axis=0)
+    return total_pwr.mean() if total_pwr.size > 1 else total_pwr
 
-        features.extend([mav, mavs, rms, zc, wl, ssc])
+# Build dataset from NinaPro data
+def build_dataset_from_ninapro(emg, stimulus, repetition, features=None):
+    """Build a dataset from the NinaPro database."""
+    # Calculate the number of unique stimuli and repetitions, subtracting 1 to exclude the resting condition
+    n_stimuli = np.unique(stimulus).size - 1
+    n_repetitions = np.unique(repetition).size - 1
+    # Total number of samples is the product of stimuli and repetitions
+    n_samples = n_stimuli * n_repetitions
+    
+    # Number of channels in the EMG data
+    n_channels = emg.shape[1]
+    # Calculate the total number of features by summing the number of channels for each feature
+    n_features = n_channels * len(features)
+    
+    # Initialize the dataset and labels arrays with zeros
+    dataset = np.zeros((n_samples, n_features))
+    labels = np.zeros(n_samples)
+    current_sample_index = 0
+    
+    # Loop over each stimulus and repetition to extract features
+    for i in range(n_stimuli):
+        for j in range(n_repetitions):
+            # Assign the label for the current sample
+            labels[current_sample_index] = i + 1
+            # Calculate the current sample index based on stimulus and repetition
+            current_sample_index = i * n_repetitions + j
+            current_feature_index = 0
+            # Select the time steps corresponding to the current stimulus and repetition
+            selected_tsteps = np.logical_and(stimulus == i + 1, repetition == j + 1).squeeze()
+            
+            # Loop over each channel
+            for ch in range(n_channels):
+                # Loop over each feature function provided
+                for feature in features:
+                    # Apply the feature function to the selected EMG data for the current channel and store the result
+                    dataset[current_sample_index, current_feature_index] = feature(emg[selected_tsteps, ch])
+                    # Update the feature index for the next feature
+                    current_feature_index += 1
 
-    return np.array(features)
-
-def extract_features_from_data(data):
-    """Define a function to extract all features from all trials."""
-    num_trials = data.shape[0]
-    features = []
-
-    for i in range(num_trials):
-        trial_features = extract_features_basic(data[i, :, :])
-        features.append(trial_features)
-
-    return np.vstack(features)
-
-def reshape_labels(labels, samples_per_trial):
-    """Reshape the labels to match the number of trials."""
-    num_trials = labels.shape[0] // samples_per_trial
-    labels_reshaped = labels[:num_trials * samples_per_trial].reshape(num_trials, samples_per_trial)
-    labels_mode = mode(labels_reshaped, axis=1)[0].flatten()
-    return labels_mode
+            # Move to the next sample
+            current_sample_index += 1
+            
+    # Return the constructed dataset and corresponding labels
+    return dataset, labels
