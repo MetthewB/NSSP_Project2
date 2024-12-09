@@ -40,28 +40,34 @@ def extract_features_advanced(trial, deadzone, winsize, wininc):
 
     return feat
 
-# Frequency domain features
-def mean_frequency(x, fs=2000):
-    """Calculate the mean frequency of the signal."""
-    freqs, psd = welch(x, fs=fs, axis=0)
-    freqs = freqs[:, np.newaxis]
-    mean_freq = np.sum(freqs * psd, axis=0) / np.sum(psd, axis=0)
-    return mean_freq.mean() if mean_freq.size > 1 else mean_freq
+def mav(x):
+    return np.mean(np.abs(x), axis=0)
 
-def median_frequency(x, fs=2000):
-    """Calculate the median frequency of the signal."""
-    freqs, psd = welch(x, fs=fs, axis=0)
-    cumulative_power = np.cumsum(psd, axis=0)
-    if psd.ndim == 1:
-        total_power = cumulative_power[-1]
-        median_freq = freqs[np.where(cumulative_power >= total_power / 2)[0][0]]
-    else:
-        total_power = cumulative_power[-1, :]
-        median_freqs = np.zeros(psd.shape[1])
-        for i in range(psd.shape[1]):
-            median_freqs[i] = freqs[np.where(cumulative_power[:, i] >= total_power[i] / 2)[0][0]]
-        median_freq = median_freqs.mean() if median_freqs.size > 1 else median_freqs
-    return median_freq
+def std(x):
+    return np.std(x, axis=0)
+
+def maxav(x):
+    return np.max(np.abs(x), axis=0)
+
+def rms(x):
+    return np.sqrt(np.mean(x**2, axis=0))
+
+def wl(x):
+    return np.sum(np.abs(np.diff(x, axis=0)), axis=0)
+
+# Slope Sign Change 
+def ssc(x):
+    """
+    Computes the Slope Sign Change (SSC) feature.
+    Parameters:
+        x: 2D array-like, where rows represent time steps and columns are channels
+    Returns:
+        Array of SSC values for each channel
+    """
+    diff1 = np.diff(x, axis=0)
+    diff2 = np.sign(diff1)
+    ssc_values = np.sum((diff2[1:] != diff2[:-1]), axis=0)
+    return ssc_values
 
 def total_power(x, fs=2000):
     """Calculate the total power of the signal."""
