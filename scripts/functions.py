@@ -3,7 +3,6 @@ import zipfile
 import numpy as np
 from scipy.signal import butter, sosfiltfilt, welch
 import scipy.io as sio
-from scipy.stats import mode
 import os
 from features import *
 
@@ -68,6 +67,12 @@ def ssc(x):
     diff2 = np.sign(diff1)
     ssc_values = np.sum((diff2[1:] != diff2[:-1]), axis=0)
     return ssc_values
+
+def mean_frequency(x, fs=2000):
+    """Calculate the mean frequency of the signal."""
+    freqs, psd = welch(x, fs=fs, axis=0)
+    mean_freq = np.sum(freqs * psd, axis=0) / np.sum(psd, axis=0)
+    return mean_freq
 
 def total_power(x, fs=2000):
     """Calculate the total power of the signal."""
