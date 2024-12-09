@@ -1,0 +1,47 @@
+# Ignore Python bytecode files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore logs
+*.log
+
+# Ignore data directory
+data/
+
+# Ignore model files and checkpoints
+*.h5
+*.pkl
+*.pkl.gz
+*.joblib
+
+# Ignore dependency and configuration files
+*.lock
+Pipfile.lock
+node_modules/
+
+# Ignore .DS_Store (macOS specific)
+.DS_Store
+
+# Ignore coverage reports
+.coverage
+coverage.xml
+*.cover
+
+# Ignore the GitHub Actions cache
+/.github/cache/
+
+
+# Ignore user-specific config files
+.idea/
+.vscode/
