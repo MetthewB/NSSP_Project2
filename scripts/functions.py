@@ -1,22 +1,70 @@
 # Import necessary libraries
+import os
 import zipfile
 import numpy as np
-from scipy.signal import butter, sosfiltfilt, welch
 import scipy.io as sio
-import os
+from scipy.signal import butter, sosfiltfilt, welch
 from features import *
 
-def bandpass_filter(data, fs=2000.0, lowcut=20.0, highcut=450.0, order=4):
-    """Apply a bandpass filter and remove powerline noise and its harmonics."""
+def extract_and_load_mat_files(base_zip_path, extraction_dir, subject_num):
+    """
+    Extracts zip files and loads the specified .mat file for a given subject.
+    
+    Parameters:
+        base_zip_path (str): The base path to the zip files.
+        extraction_dir (str): The directory where the files will be extracted.
+        subject_num (int): The subject number to process.
+    
+    Returns:
+        dict: A dictionary containing the data from the .mat file.
+    """
+    # Loop through all subjects
+    for num in range(1, 28):
+        zip_file_path = os.path.join(base_zip_path, f's{num}.zip')
+        
+        # Extract the zip file
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            zip_ref.extractall(extraction_dir)
+        
+        # Define the paths to the .mat files
+        mat_file_path_e1 = os.path.join(extraction_dir, f'S{num}_A1_E1.mat')
+        mat_file_path_e2 = os.path.join(extraction_dir, f'S{num}_A1_E2.mat')
+        mat_file_path_e3 = os.path.join(extraction_dir, f'S{num}_A1_E3.mat')
+        
+        # Delete the S[subject number]_A1_E2.mat and S[subject number]_A1_E3.mat files
+        if os.path.exists(mat_file_path_e2):
+            os.remove(mat_file_path_e2)
+        if os.path.exists(mat_file_path_e3):
+            os.remove(mat_file_path_e3)
+    
+    # Now, specifically work on the specified subject's S_A1_E1.mat
+    mat_file_path_e1 = os.path.join(extraction_dir, f'S{subject_num}_A1_E1.mat')
+    
+    # Load the .mat file using scipy.io.loadmat
+    mat_data = sio.loadmat(mat_file_path_e1)
+    
+    # Print the keys of the loaded .mat file to see available variables
+    print(mat_data.keys())
+    
+    # Extract the data and labels
+    emg = mat_data['emg']
+    stimulus = mat_data['restimulus']
+    repetition = mat_data['rerepetition']
+    
+    return emg, stimulus, repetition
+
+def bandpass_filter(data, fs=2000.0, lowcut=20.0, highcut=450.0, order=4, apply_notch=True):
+    """Apply a bandpass filter and optionally remove powerline noise and its harmonics."""
     # Apply bandpass filter
     sos = butter(order, [lowcut, highcut], fs=fs, btype='bandpass', output='sos')
     filtered_data = sosfiltfilt(sos, data.T).T
 
-    # Apply notch filters to remove powerline noise and its harmonics
-    powergrid_noise_frequencies_Hz = [harmonic_idx * 50 for harmonic_idx in range(1, 3)]  # 50Hz and 100Hz
-    for noise_frequency in powergrid_noise_frequencies_Hz:
-        sos = butter(order, [noise_frequency - 2, noise_frequency + 2], fs=fs, btype='bandstop', output='sos')
-        filtered_data = sosfiltfilt(sos, filtered_data.T).T
+    if apply_notch:
+        # Apply notch filters to remove powerline noise and its harmonics
+        powergrid_noise_frequencies_Hz = [harmonic_idx * 50 for harmonic_idx in range(1, 3)]  # 50Hz and 100Hz
+        for noise_frequency in powergrid_noise_frequencies_Hz:
+            sos = butter(order, [noise_frequency - 2, noise_frequency + 2], fs=fs, btype='bandstop', output='sos')
+            filtered_data = sosfiltfilt(sos, filtered_data.T).T
 
     return filtered_data
 
@@ -39,50 +87,34 @@ def extract_features_advanced(trial, deadzone, winsize, wininc):
 
     return feat
 
-def mav(x):
+def mav(x): # Mean Absolute Value
     return np.mean(np.abs(x), axis=0)
-
-def std(x):
+def std(x): # Standard Deviation
     return np.std(x, axis=0)
-
-def maxav(x):
+def maxav(x): # Maximum Absolute Value
     return np.max(np.abs(x), axis=0)
-
-def rms(x):
+def rms(x): # Root Mean Square
     return np.sqrt(np.mean(x**2, axis=0))
-
-def wl(x):
-    return np.sum(np.abs(np.diff(x, axis=0)), axis=0)
-
-# Slope Sign Change 
-def ssc(x):
-    """
-    Computes the Slope Sign Change (SSC) feature.
-    Parameters:
-        x: 2D array-like, where rows represent time steps and columns are channels
-    Returns:
-        Array of SSC values for each channel
-    """
-    diff1 = np.diff(x, axis=0)
-    diff2 = np.sign(diff1)
-    ssc_values = np.sum((diff2[1:] != diff2[:-1]), axis=0)
-    return ssc_values
-
-def mean_frequency(x, fs=2000):
-    """Calculate the mean frequency of the signal."""
-    freqs, psd = welch(x, fs=fs, axis=0)
-    mean_freq = np.sum(freqs * psd, axis=0) / np.sum(psd, axis=0)
-    return mean_freq
-
-def total_power(x, fs=2000):
-    """Calculate the total power of the signal."""
+def wl(x): # Waveform Length
+    return np.mean(np.abs(np.diff(x, axis=0)), axis=0)
+def ssc(x): # Slope Sign Change
+    return np.mean(np.diff(np.sign(np.diff(x, axis=0)), axis=0) != 0, axis=0)
+def dft_energy(x):  # Energy in DFT
+    return np.mean(np.abs(np.fft.fft(x, axis=0))**2, axis=0)
+def median_frequency(x): # Median Frequency
+    freqs = np.fft.fftfreq(x.shape[0])
+    magnitudes = np.abs(np.fft.fft(x, axis=0))
+    cumulative_sum = np.cumsum(magnitudes, axis=0)
+    total_sum = cumulative_sum[-1]
+    median_freq = freqs[np.searchsorted(cumulative_sum, total_sum / 2)]
+    return median_freq
+def total_power(x, fs=2000): # Total Power
     freqs, psd = welch(x, fs=fs, axis=0)
     total_pwr = np.sum(psd, axis=0)
-    return total_pwr.mean() if total_pwr.size > 1 else total_pwr
+    return total_pwr
 
 # Build dataset from NinaPro data
 def build_dataset_from_ninapro(emg, stimulus, repetition, features=None):
-    """Build a dataset from the NinaPro database."""
     # Calculate the number of unique stimuli and repetitions, subtracting 1 to exclude the resting condition
     n_stimuli = np.unique(stimulus).size - 1
     n_repetitions = np.unique(repetition).size - 1
