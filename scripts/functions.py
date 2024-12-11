@@ -46,7 +46,7 @@ def extract_and_load_mat_files(base_zip_path, extraction_dir, subject_num):
     mat_data = sio.loadmat(mat_file_path_e1)
     
     # Print the keys of the loaded .mat file to see available variables
-    print(mat_data.keys())
+    print(f"Dataset variables: {mat_data.keys()}")
     
     # Extract the data and labels
     emg = mat_data['emg']
@@ -88,6 +88,10 @@ def bandpass_filter(data, fs=2000.0, lowcut=20.0, highcut=450.0, order=4, apply_
 def mav(x):
     """Mean Absolute Value."""
     return np.mean(np.abs(x), axis=0)
+
+def mean(x):
+    """Mean."""
+    return np.mean(x, axis=0)
 
 def std(x):
     """Standard Deviation."""
@@ -355,9 +359,12 @@ def plot_emg_envelopes(emg, id_column, stimulus, repetition, n_stimuli, n_repeti
         ax = axes[i]
         for channel_idx in range(emg_envelope_first_stimuli_repetition.shape[1]):  # Iterate over channels
             ax.plot(emg_envelope_first_stimuli_repetition[:, channel_idx], color=colors(channel_idx), label=f'Channel {channel_idx+1}')
-        ax.set_title(f"Subject {int(subject_num)} - Stimulus 1, Repetition 1")
-        ax.set_xlabel("Time")
-        ax.set_ylabel("EMG Signal")
+        ax.set_title(f"Subject {int(subject_num)}")
+        if i >= 24:  # Bottom row
+            ax.set_xlabel("Time [s]", fontsize=10)
+        if i % 3 == 0:  # Leftmost column
+            ax.set_ylabel("EMG Signal [mV]", fontsize=10)
+        plt.suptitle("Envelopes of the EMG signal for all subjects (Stimulus 1, Repetition 1)", fontsize=16)
 
     # Add a legend to the first subplot
     axes[0].legend(loc='upper right', prop={'size': 8})
