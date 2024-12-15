@@ -305,7 +305,7 @@ def load_and_concatenate_subjects(base_path, extraction_dir, n_subjects=27, isZi
     return subject_id_column, emg_data_all, stimulus_all, repetition_all
 
 
-def plot_emg_envelopes(emg, id_column, stimulus, repetition, n_stimuli, n_repetitions, mov_mean_length=25):
+def plot_emg_envelopes(emg, id_column, stimulus, repetition, n_stimuli, n_repetitions, mov_mean_length=25, filtered=False):
     """
     Plots the EMG envelopes for each subject.
 
@@ -365,8 +365,18 @@ def plot_emg_envelopes(emg, id_column, stimulus, repetition, n_stimuli, n_repeti
         if i % 3 == 0:  # Leftmost column
             ax.set_ylabel("EMG Signal [mV]", fontsize=10)
         plt.suptitle("Envelopes of the EMG signal for all subjects (Stimulus 1, Repetition 1)", fontsize=16)
+        # Check for channels that are zero
+        zero_channels = np.where(np.all(emg_envelope_first_stimuli_repetition == 0, axis=0))[0]
+
+        # print the zero channels
+        if zero_channels.size > 0: 
+            print(f"Subject {int(subject_num)} has zero channels: {zero_channels}")
 
     # Add a legend to the first subplot
     axes[0].legend(loc='upper right', prop={'size': 8})
-
+    figures_dir = os.path.join('..', 'output', 'Part 2')
+    if filtered:
+        plt.savefig(os.path.join(figures_dir, 'emg_envelopes_all_subjects_filtered.png'))
+    else:
+        plt.savefig(os.path.join(figures_dir, 'emg_envelopes_all_subjects.png'))
     plt.show()
