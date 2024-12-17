@@ -6,6 +6,7 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 from scipy.ndimage import convolve1d
 from scipy.signal import butter, sosfiltfilt, welch
+from statsmodels.tsa.ar_model import AutoReg
 
 
 def extract_and_load_mat_files(base_zip_path, extraction_dir, subject_num):
@@ -131,6 +132,23 @@ def total_power(x, fs=2000):
     freqs, psd = welch(x, fs=fs, axis=0)
     total_pwr = np.sum(psd, axis=0)
     return total_pwr
+
+def wilson_amplitude(x, threshold=1e-5):
+    """Wilson Amplitude."""
+    wamp = np.sum(np.abs(x) > threshold, axis=0)
+    return wamp
+
+def ar_coefficients(x):
+    """4th-order Auto-Regressive Coefficients."""
+    model = AutoReg(x, lags=4, old_names=False)
+    ar_fit = model.fit()
+    return ar_fit.params.tolist() 
+
+def log_variance(x):
+    """Log Variance."""
+    #normaize the data bewteen 1 and 2
+    x = (x - np.min(x, axis=0)) / (np.max(x, axis=0) - np.min(x, axis=0)) + 1
+    return np.log(np.var(x, axis=0))
 
 
 def build_dataset_from_ninapro(emg, stimulus, repetition, features=None):
