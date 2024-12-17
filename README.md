@@ -15,6 +15,7 @@ The repository contains the following directories:
 - **`data/`**  
   Contains the dataset for the project.  
   - `s1.zip`: The EMG data for subject 1, provided in compressed `.zip` format.
+  - For part 3 you should download datasets S1_E1_A1, S1_E1_A2, S1_E1_A3 from this page (https://ninapro.hevs.ch/instructions/DB8.html), and place them into the folder
 
 - **`output/`**  
   Stores the results of the analysis, including visualizations.  
@@ -22,7 +23,9 @@ The repository contains the following directories:
 
 - **`scripts/`**  
   Contains the code for the project.  
-  - `main.ipynb`: The primary Jupyter notebook to run the analysis pipeline.  
+  - `part1.ipynb`: The Jupyter notebook to run for the first part of the project.
+  - `part2.ipynb`: The Jupyter notebook to run for the second part of the project.
+  - `part3.ipynb`: The Jupyter notebook to run for the third part of the project.
   - `functions.py`: Includes helper functions for preprocessing and other operations.  
   - `features.py`: Contains functions for feature extraction from EMG signals.
 
@@ -61,36 +64,8 @@ The project uses the following Python libraries:
 2. **Install the required libraries**  
    Ensure Python 3.7+ is installed. Install the dependencies using `pip`:
    ```bash
-   pip install numpy pandas scipy matplotlib scikit-learn pywavelets
+   pip install numpy pandas scipy matplotlib scikit-learn pywavelets statsmodels
    ```
-
-3. **Run the analysis**  
-   Open and execute the Jupyter notebook `main.ipynb` in the `scripts/` folder to process the data and generate outputs.  
-   Note: The `main.ipynb` notebook automatically handles unzipping the dataset from `data/s1.zip`.
-
-   ```bash
-   jupyter notebook scripts/main.ipynb
-   ```
-
----
-
-### Key Functionalities
-
-1. **Data Preprocessing**  
-   - EMG data extraction from `.mat` files.  
-   - Signal filtering using Butterworth filters for noise reduction.
-
-2. **Visualization**  
-   - Plotting raw and processed signals to analyze trends and patterns. 
-
-3. **Feature Extraction**  
-   - Application of wavelet transforms (`pywt`) for feature derivation.  
-   - Statistical feature computation (e.g., mean, variance, mode).
-
-4. **Train-Test Split**  
-   - Dividing data into training and testing subsets for downstream tasks.
-
----
 
 ### License
 
